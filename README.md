@@ -45,12 +45,20 @@ A revolutionary blockchain-powered fitness tracking application that combines re
    npm install
    ```
 
-3. **Start development server**
+3. **Setup environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your actual values:
+   # VITE_PUBLIC_CONTRACT_ADDRESS=0x742d35Cc6634C0532925a3b8D4C9db96c4b5Da5A
+   # VITE_PUBLIC_INFURA_API_KEY=your-infura-or-alchemy-key
+   ```
+
+4. **Start development server**
    ```bash
    npm run dev
    ```
 
-4. **Open in browser**
+5. **Open in browser**
    Navigate to `http://localhost:5173`
 
 ## 🌍 Earth Background Setup
@@ -79,6 +87,21 @@ The landing page features a stunning Earth background. To use a custom Earth ima
 4. Submit valid loops to the blockchain
 
 ## 🔗 Blockchain Integration
+
+### Environment Configuration
+Before using blockchain features, configure your environment variables:
+
+```env
+# Required: Your deployed smart contract address
+VITE_PUBLIC_CONTRACT_ADDRESS=0x742d35Cc6634C0532925a3b8D4C9db96c4b5Da5A
+
+# Required: Infura/Alchemy API key for Ethereum connection
+VITE_PUBLIC_INFURA_API_KEY=your-infura-or-alchemy-key
+```
+
+**Get API Key:**
+1. **Infura:** Sign up at [infura.io](https://infura.io) → Create project → Copy Project ID
+2. **Alchemy:** Sign up at [alchemy.com](https://alchemy.com) → Create app → Copy API key
 
 ### MetaMask Connection
 - Connect your MetaMask wallet

@@ -6,7 +6,28 @@ import LoadingScreen from './components/LoadingScreen';
 import FloatingActions from './components/FloatingActions';
 import ContestPage from './components/ContestPage';
 import SimpleMap from './components/SimpleMap';
+import BlockchainStatus from './components/BlockchainStatus';
 import './App.css';
+import { testBlockchainConfig, runBlockchainTests } from './utils/blockchainTest';
+
+// Blockchain Configuration
+const INFURA_API_KEY = import.meta.env.VITE_PUBLIC_INFURA_API_KEY;
+const CONTRACT_ADDRESS = import.meta.env.VITE_PUBLIC_CONTRACT_ADDRESS;
+const NETWORK_ID = import.meta.env.VITE_PUBLIC_NETWORK_ID || '1';
+
+// Create Infura provider for fallback blockchain operations
+const getInfuraProvider = () => {
+  if (!INFURA_API_KEY) {
+    console.warn('Infura API key not configured. Some blockchain features may not work.');
+    return null;
+  }
+
+  const networkName = NETWORK_ID === '1' ? 'mainnet' :
+    NETWORK_ID === '11155111' ? 'sepolia' :
+      NETWORK_ID === '137' ? 'polygon' : 'mainnet';
+
+  return new ethers.JsonRpcProvider(`https://${networkName}.infura.io/v3/${INFURA_API_KEY}`);
+};
 
 
 
@@ -14,6 +35,12 @@ function App() {
   const [currentPage, setCurrentPage] = useState('loading'); // 'loading', 'landing', 'app', or 'contests'
   const [walletAddress, setWalletAddress] = useState('');
   const [isTracking, setIsTracking] = useState(false);
+
+  // Blockchain state
+  const [provider, setProvider] = useState(null);
+  const [signer, setSigner] = useState(null);
+  const [contract, setContract] = useState(null);
+  const [networkInfo, setNetworkInfo] = useState(null);
 
   const [startTime, setStartTime] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -73,13 +100,29 @@ function App() {
       if (accounts.length > 0) {
         const address = accounts[0];
         setWalletAddress(address);
-        setMessage(`✅ MetaMask Connected: ${address.slice(0, 6)}...${address.slice(-4)}`);
 
-        // Optional: Switch to a specific network (e.g., Ethereum mainnet)
+        // Create MetaMask provider and signer
+        const metamaskProvider = new ethers.BrowserProvider(window.ethereum);
+        const metamaskSigner = await metamaskProvider.getSigner();
+
+        setProvider(metamaskProvider);
+        setSigner(metamaskSigner);
+
+        // Get network information
+        const network = await metamaskProvider.getNetwork();
+        setNetworkInfo({
+          name: network.name,
+          chainId: network.chainId.toString()
+        });
+
+        setMessage(`✅ MetaMask Connected: ${address.slice(0, 6)}...${address.slice(-4)} (${network.name})`);
+
+        // Optional: Switch to the configured network
+        const targetChainId = `0x${parseInt(NETWORK_ID).toString(16)}`;
         try {
           await window.ethereum.request({
             method: 'wallet_switchEthereumChain',
-            params: [{ chainId: '0x1' }], // Ethereum mainnet
+            params: [{ chainId: targetChainId }],
           });
         } catch (switchError) {
           console.log('Network switch failed or cancelled:', switchError);
@@ -159,6 +202,48 @@ function App() {
     }, 3000); // Show loading for 3 seconds
 
     return () => clearTimeout(timer);
+  }, []);
+
+  // Initialize blockchain connection
+  useEffect(() => {
+    const initializeBlockchain = async () => {
+      try {
+        // Run blockchain configuration tests
+        const configOk = testBlockchainConfig();
+
+        if (!configOk) {
+          console.warn('⚠️ Blockchain configuration incomplete. Check your .env file.');
+          return;
+        }
+
+        // Initialize Infura provider for read-only operations
+        const infuraProvider = getInfuraProvider();
+        if (infuraProvider) {
+          setProvider(infuraProvider);
+
+          // Get network information
+          const network = await infuraProvider.getNetwork();
+          setNetworkInfo({
+            name: network.name,
+            chainId: network.chainId.toString()
+          });
+
+          console.log('✅ Blockchain initialized:', {
+            network: network.name,
+            chainId: network.chainId.toString(),
+            contractAddress: CONTRACT_ADDRESS
+          });
+        }
+      } catch (error) {
+        console.warn('⚠️ Blockchain initialization failed:', error.message);
+        console.log('💡 Run runBlockchainTests() in console for detailed diagnostics');
+      }
+    };
+
+    initializeBlockchain();
+
+    // Make test function available globally for debugging
+    window.runBlockchainTests = runBlockchainTests;
   }, []);
 
   // Start tracking with enhanced GPS monitoring
@@ -312,21 +397,45 @@ function App() {
     }
 
     try {
+      if (!signer) {
+        setMessage('❌ Please connect MetaMask wallet first');
+        return;
+      }
+
       // Generate loop ID from starting coordinates
       const loopId = `loop_${start[0].toFixed(4)}_${start[1].toFixed(4)}`;
 
-      setMessage(`Submitting to Ethereum blockchain... Loop ID: ${loopId}, Time: ${elapsedTime}s`);
+      setMessage(`🔄 Submitting to ${networkInfo?.name || 'Ethereum'} blockchain... Loop ID: ${loopId}`);
 
-      // Real MetaMask transaction (simplified - would need actual smart contract)
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
+      // Prepare fitness data for blockchain
+      const fitnessData = {
+        loopId,
+        startCoords: [start[0], start[1]],
+        endCoords: [end[0], end[1]],
+        distance: Math.round(distance),
+        time: elapsedTime,
+        timestamp: Math.floor(Date.now() / 1000),
+        pathLength: path.length
+      };
 
-      // This would be a real smart contract call in production
-      // For now, we'll just show the transaction would be sent
-      setMessage(`✅ Ready to submit to Ethereum! Loop ${loopId}, Time: ${elapsedTime}s, Distance: ${distance.toFixed(0)}m`);
+      console.log('📊 Fitness Data:', fitnessData);
+
+      // If contract address is configured, attempt contract interaction
+      if (CONTRACT_ADDRESS && CONTRACT_ADDRESS !== '0x...Your...Deployed...Address...') {
+        // TODO: Add actual smart contract interaction here
+        // const contract = new ethers.Contract(CONTRACT_ADDRESS, contractABI, signer);
+        // const tx = await contract.submitFitnessData(fitnessData);
+        // await tx.wait();
+
+        setMessage(`✅ Ready to submit to blockchain! Contract: ${CONTRACT_ADDRESS.slice(0, 6)}...${CONTRACT_ADDRESS.slice(-4)}`);
+      } else {
+        setMessage(`✅ Fitness data prepared for blockchain! Loop: ${loopId}, Time: ${elapsedTime}s, Distance: ${distance.toFixed(0)}m`);
+        console.log('ℹ️ Contract address not configured. Add VITE_PUBLIC_CONTRACT_ADDRESS to .env file');
+      }
 
     } catch (error) {
-      setMessage('❌ Error: ' + error.message);
+      console.error('Blockchain submission error:', error);
+      setMessage(`❌ Blockchain Error: ${error.message}`);
     }
   };
 
@@ -633,6 +742,13 @@ function App() {
           onBackToLanding={handleBackToLanding}
           onShowContests={handleShowContests}
           isTracking={isTracking}
+        />
+
+        {/* Blockchain Status Debug Panel */}
+        <BlockchainStatus
+          provider={provider}
+          networkInfo={networkInfo}
+          walletAddress={walletAddress}
         />
       </motion.div>
     </AnimatePresence>
