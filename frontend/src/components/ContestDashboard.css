@@ -1,0 +1,220 @@
+.contest-dashboard {
+    width: 100%;
+    margin: 0;
+    padding: 0 20px;
+    box-sizing: border-box;
+}
+
+.profile-summary {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 25px;
+    margin-bottom: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.profile-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #D4AF37 0%, #F7DC6F 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #0A1929;
+}
+
+.user-details h3 {
+    color: white;
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.user-details p {
+    color: #B0BEC5;
+    font-size: 0.9rem;
+    margin: 2px 0;
+}
+
+.edit-profile-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+}
+
+.edit-profile-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+}
+
+.contest-tabs {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 30px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    padding: 5px;
+}
+
+.tab {
+    flex: 1;
+    padding: 12px 20px;
+    background: transparent;
+    border: none;
+    color: #B0BEC5;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.tab.active {
+    background: linear-gradient(135deg, #D4AF37 0%, #F7DC6F 100%);
+    color: #0A1929;
+    font-weight: 600;
+}
+
+.tab:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.contest-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 25px;
+    margin-bottom: 30px;
+}
+
+.no-contests {
+    text-align: center;
+    padding: 60px 20px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    grid-column: 1 / -1;
+}
+
+.no-contests h3 {
+    color: white;
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+}
+
+.no-contests p {
+    color: #B0BEC5;
+    font-size: 1rem;
+}
+
+.age-category-info {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    padding: 20px;
+    margin-top: 30px;
+}
+
+.age-category-info h4 {
+    color: white;
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.category-card {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.category-badge {
+    background: linear-gradient(135deg, #D4AF37 0%, #F7DC6F 100%);
+    color: #0A1929;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.category-card p {
+    color: #B0BEC5;
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .profile-summary {
+        flex-direction: column;
+        gap: 20px;
+        text-align: center;
+    }
+
+    .profile-info {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .contest-tabs {
+        flex-direction: column;
+    }
+
+    .tab {
+        text-align: center;
+    }
+
+    .contest-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .category-card {
+        flex-direction: column;
+        text-align: center;
+        gap: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .contest-dashboard {
+        padding: 0 10px;
+    }
+
+    .profile-summary {
+        padding: 20px;
+    }
+
+    .avatar {
+        width: 50px;
+        height: 50px;
+        font-size: 1.2rem;
+    }
+
+    .user-details h3 {
+        font-size: 1.1rem;
+    }
+}
