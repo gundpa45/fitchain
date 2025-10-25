@@ -471,7 +471,8 @@
     }
 }
 
-/ * Additional Responsive Design */ @media (max-width: 1440px) {
+/* Additional Responsive Design */
+@media (max-width: 1440px) {
     .nft-rewards {
         max-width: 95%;
     }
