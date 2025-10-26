@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
-import { ethers } from 'ethers';
+import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import LandingPage from './components/LandingPage';
 import LoadingScreen from './components/LoadingScreen';
@@ -7,40 +6,47 @@ import FloatingActions from './components/FloatingActions';
 import ContestPage from './components/ContestPage';
 import SimpleMap from './components/SimpleMap';
 import BlockchainStatus from './components/BlockchainStatus';
+import Leaderboard from './components/Leaderboard';
+import ContestLeaderboard from './components/ContestLeaderboard';
+import StellarWalletConnect from './components/StellarWalletConnect';
+import SimpleWalletConnect from './components/SimpleWalletConnect';
+import WalletIntegration from './components/WalletIntegration';
+import GlobalNavigation from './components/GlobalNavigation';
+import NavigationDemo from './components/NavigationDemo';
+import FreighterStatus from './components/FreighterStatus';
+import stellarWallet from './utils/stellarWallet';
 import './App.css';
-import { testBlockchainConfig, runBlockchainTests } from './utils/blockchainTest';
 
-// Blockchain Configuration
-const INFURA_API_KEY = import.meta.env.VITE_PUBLIC_INFURA_API_KEY;
-const CONTRACT_ADDRESS = import.meta.env.VITE_PUBLIC_CONTRACT_ADDRESS;
-const NETWORK_ID = import.meta.env.VITE_PUBLIC_NETWORK_ID || '1';
+// Global Wallet Context for persistent connection across pages
+const WalletContext = createContext();
+export const useWallet = () => useContext(WalletContext);
 
-// Create Infura provider for fallback blockchain operations
-const getInfuraProvider = () => {
-  if (!INFURA_API_KEY) {
-    console.warn('Infura API key not configured. Some blockchain features may not work.');
-    return null;
-  }
+// Stellar Network Configuration
+const STELLAR_NETWORK = import.meta.env.VITE_STELLAR_NETWORK || 'testnet';
+const STELLAR_HORIZON_URL = import.meta.env.VITE_STELLAR_HORIZON_URL || 'https://horizon-testnet.stellar.org';
 
-  const networkName = NETWORK_ID === '1' ? 'mainnet' :
-    NETWORK_ID === '11155111' ? 'sepolia' :
-      NETWORK_ID === '137' ? 'polygon' : 'mainnet';
-
-  return new ethers.JsonRpcProvider(`https://${networkName}.infura.io/v3/${INFURA_API_KEY}`);
+// Stellar network helper
+const getStellarNetworkConfig = () => {
+  return {
+    network: STELLAR_NETWORK,
+    horizonUrl: STELLAR_HORIZON_URL,
+    networkPassphrase: STELLAR_NETWORK === 'mainnet'
+      ? 'Public Global Stellar Network ; September 2015'
+      : 'Test SDF Network ; September 2015'
+  };
 };
 
 
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('loading'); // 'loading', 'landing', 'app', or 'contests'
+  const [currentPage, setCurrentPage] = useState('loading'); // 'loading', 'landing', 'app', 'contests', 'leaderboard', 'contest-leaderboard', 'demo', or 'wallet'
   const [walletAddress, setWalletAddress] = useState('');
   const [isTracking, setIsTracking] = useState(false);
 
-  // Blockchain state
-  const [provider, setProvider] = useState(null);
-  const [signer, setSigner] = useState(null);
-  const [contract, setContract] = useState(null);
-  const [networkInfo, setNetworkInfo] = useState(null);
+  // Global Stellar wallet state - persists across all pages
+  const [stellarWalletInfo, setStellarWalletInfo] = useState(null);
+  const [stellarNetwork, setStellarNetwork] = useState(null);
+  const [walletConnectionPersisted, setWalletConnectionPersisted] = useState(false);
 
   const [startTime, setStartTime] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -59,6 +65,8 @@ function App() {
   });
   const [lastValidPosition, setLastValidPosition] = useState(null);
   const [isMoving, setIsMoving] = useState(false);
+  const [lastUpdateTime, setLastUpdateTime] = useState(null);
+  const [trackingDuration, setTrackingDuration] = useState(0);
 
   const watchIdRef = useRef(null);
 
@@ -78,67 +86,31 @@ function App() {
     return R * c;
   };
 
-  // Connect MetaMask wallet
-  const connectWallet = async () => {
-    try {
-      // Check if MetaMask is installed
-      if (!window.ethereum) {
-        if (window.confirm('MetaMask not found. MetaMask is required for Ethereum blockchain.\n\nWould you like to install it now?')) {
-          window.open('https://metamask.io/download/', '_blank');
-        }
-        setMessage('⚠️ Please install MetaMask wallet');
-        return;
-      }
+  // Global wallet connection handlers - persist across all pages
+  const handleStellarWalletConnect = (walletInfo) => {
+    setStellarWalletInfo(walletInfo);
+    setWalletAddress(walletInfo.publicKey);
+    setStellarNetwork(getStellarNetworkConfig());
+    setWalletConnectionPersisted(true);
+    
+    // Store in localStorage for persistence
+    localStorage.setItem('stellarWalletInfo', JSON.stringify(walletInfo));
+    localStorage.setItem('stellarWalletConnected', 'true');
+    
+    setMessage(`✅ Stellar Wallet Connected: ${stellarWallet.formatPublicKey ? stellarWallet.formatPublicKey(walletInfo.publicKey) : walletInfo.publicKey.slice(0, 6) + '...' + walletInfo.publicKey.slice(-4)} (${walletInfo.walletType})`);
+  };
 
-      setMessage('🔄 Requesting wallet connection...');
-
-      // Request account access
-      const accounts = await window.ethereum.request({
-        method: 'eth_requestAccounts'
-      });
-
-      if (accounts.length > 0) {
-        const address = accounts[0];
-        setWalletAddress(address);
-
-        // Create MetaMask provider and signer
-        const metamaskProvider = new ethers.BrowserProvider(window.ethereum);
-        const metamaskSigner = await metamaskProvider.getSigner();
-
-        setProvider(metamaskProvider);
-        setSigner(metamaskSigner);
-
-        // Get network information
-        const network = await metamaskProvider.getNetwork();
-        setNetworkInfo({
-          name: network.name,
-          chainId: network.chainId.toString()
-        });
-
-        setMessage(`✅ MetaMask Connected: ${address.slice(0, 6)}...${address.slice(-4)} (${network.name})`);
-
-        // Optional: Switch to the configured network
-        const targetChainId = `0x${parseInt(NETWORK_ID).toString(16)}`;
-        try {
-          await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: targetChainId }],
-          });
-        } catch (switchError) {
-          console.log('Network switch failed or cancelled:', switchError);
-        }
-      }
-
-    } catch (error) {
-      console.error('Wallet connection error:', error);
-      if (error.code === 4001) {
-        setMessage('❌ Connection rejected. Please approve the connection request.');
-      } else if (error.code === -32002) {
-        setMessage('⏳ Connection request pending. Please check MetaMask.');
-      } else {
-        setMessage('❌ Error connecting wallet: ' + error.message);
-      }
-    }
+  const handleStellarWalletDisconnect = () => {
+    setStellarWalletInfo(null);
+    setWalletAddress('');
+    setStellarNetwork(null);
+    setWalletConnectionPersisted(false);
+    
+    // Clear localStorage
+    localStorage.removeItem('stellarWalletInfo');
+    localStorage.removeItem('stellarWalletConnected');
+    
+    setMessage('🔌 Stellar wallet disconnected');
   };
 
 
@@ -154,28 +126,12 @@ function App() {
     return () => clearInterval(interval);
   }, [isTracking, startTime]);
 
-  // Listen for MetaMask account changes
+  // Initialize Stellar network configuration
   useEffect(() => {
-    if (window.ethereum) {
-      const handleAccountsChanged = (accounts) => {
-        if (accounts.length === 0) {
-          setWalletAddress('');
-          setMessage('🔌 MetaMask disconnected');
-        } else if (accounts[0] !== walletAddress) {
-          setWalletAddress(accounts[0]);
-          setMessage(`🔄 Account changed: ${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`);
-        }
-      };
-
-      window.ethereum.on('accountsChanged', handleAccountsChanged);
-
-      return () => {
-        if (window.ethereum.removeListener) {
-          window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-        }
-      };
-    }
-  }, [walletAddress]);
+    const networkConfig = getStellarNetworkConfig();
+    setStellarNetwork(networkConfig);
+    console.log('✅ Stellar network initialized:', networkConfig);
+  }, []);
 
   // Get initial location when app loads
   useEffect(() => {
@@ -204,46 +160,55 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Initialize blockchain connection
+  // Check for existing Stellar wallet connection on app load - enhanced persistence
   useEffect(() => {
-    const initializeBlockchain = async () => {
+    const checkExistingConnection = async () => {
       try {
-        // Run blockchain configuration tests
-        const configOk = testBlockchainConfig();
-
-        if (!configOk) {
-          console.warn('⚠️ Blockchain configuration incomplete. Check your .env file.');
-          return;
+        // First check localStorage for persisted connection
+        const storedWalletInfo = localStorage.getItem('stellarWalletInfo');
+        const isConnected = localStorage.getItem('stellarWalletConnected') === 'true';
+        
+        if (storedWalletInfo && isConnected) {
+          const walletInfo = JSON.parse(storedWalletInfo);
+          
+          // Verify the connection is still valid with Freighter
+          if (window.freighter && await window.freighter.isAllowed()) {
+            try {
+              const currentPublicKey = await window.freighter.getPublicKey();
+              if (currentPublicKey === walletInfo.publicKey) {
+                setStellarWalletInfo(walletInfo);
+                setWalletAddress(walletInfo.publicKey);
+                setStellarNetwork(getStellarNetworkConfig());
+                setWalletConnectionPersisted(true);
+                setMessage(`🔄 Restored Stellar wallet connection: ${walletInfo.publicKey.slice(0, 6)}...${walletInfo.publicKey.slice(-4)}`);
+                return;
+              }
+            } catch (error) {
+              console.log('Stored connection no longer valid');
+            }
+          }
         }
-
-        // Initialize Infura provider for read-only operations
-        const infuraProvider = getInfuraProvider();
-        if (infuraProvider) {
-          setProvider(infuraProvider);
-
-          // Get network information
-          const network = await infuraProvider.getNetwork();
-          setNetworkInfo({
-            name: network.name,
-            chainId: network.chainId.toString()
-          });
-
-          console.log('✅ Blockchain initialized:', {
-            network: network.name,
-            chainId: network.chainId.toString(),
-            contractAddress: CONTRACT_ADDRESS
-          });
+        
+        // Fallback to stellarWallet utility if available
+        if (stellarWallet && stellarWallet.getConnectionStatus) {
+          const status = stellarWallet.getConnectionStatus();
+          if (status.isConnected) {
+            setStellarWalletInfo(status);
+            setWalletAddress(status.publicKey);
+            setStellarNetwork(getStellarNetworkConfig());
+            setWalletConnectionPersisted(true);
+            setMessage(`🔄 Restored Stellar wallet connection: ${status.publicKey.slice(0, 6)}...${status.publicKey.slice(-4)}`);
+          }
         }
       } catch (error) {
-        console.warn('⚠️ Blockchain initialization failed:', error.message);
-        console.log('💡 Run runBlockchainTests() in console for detailed diagnostics');
+        console.log('No existing wallet connection found:', error);
+        // Clear invalid stored data
+        localStorage.removeItem('stellarWalletInfo');
+        localStorage.removeItem('stellarWalletConnected');
       }
     };
 
-    initializeBlockchain();
-
-    // Make test function available globally for debugging
-    window.runBlockchainTests = runBlockchainTests;
+    checkExistingConnection();
   }, []);
 
   // Start tracking with enhanced GPS monitoring
@@ -259,13 +224,16 @@ function App() {
     setDistance(0);
     setLastValidPosition(null);
     setIsMoving(false);
+    setSpeed(0);
+    setAccuracy(0);
+    setLastUpdateTime(null);
     setMessage('🛰️ GPS tracking started... Getting your location...');
 
     // Enhanced GPS options for real-time tracking (like Google Maps)
     const options = {
       enableHighAccuracy: true,
-      timeout: 5000,        // Faster timeout for responsiveness
-      maximumAge: 1000      // Allow 1 second old positions for smoother tracking
+      timeout: 15000,       // 15 second timeout to allow GPS to get good fix
+      maximumAge: 1000      // Allow 1 second old positions for more frequent updates
     };
 
     watchIdRef.current = navigator.geolocation.watchPosition(
@@ -281,6 +249,10 @@ function App() {
 
         // Always update path for real-time tracking (like Google Maps)
         setPath((prevPath) => [...prevPath, newPos]);
+        
+        // Update tracking duration
+        const currentTrackingDuration = startTime ? (Date.now() - startTime) / 1000 : 0;
+        setTrackingDuration(currentTrackingDuration);
 
         // Enhanced movement detection for status and distance calculation
         let actualSpeed = speed || 0;
@@ -296,42 +268,72 @@ function App() {
             longitude
           );
 
-          // More sensitive movement detection (like Google Maps)
-          const baseThreshold = Math.min(accuracy * 0.3, 2); // Much more sensitive: 30% of accuracy or 2m max
-          const speedBasedMovement = actualSpeed > 0.3; // 0.3 m/s = 1.08 km/h (walking speed)
+          // Much more sensitive movement detection for walking
+          const baseThreshold = Math.min(accuracy * 0.3, 2); // 30% of accuracy or max 2m
+          const maxReasonableDistance = 100; // Maximum reasonable distance between GPS points
+          const minWalkingSpeed = 0.2; // 0.2 m/s = 0.72 km/h (very slow walking)
+          
+          // Movement detection criteria (more lenient):
+          const speedBasedMovement = actualSpeed > minWalkingSpeed;
           const distanceBasedMovement = distanceFromLast > baseThreshold;
+          const accuracyIsReasonable = accuracy < 50; // More lenient accuracy requirement
+          
+          // Detect movement if:
+          // 1. GPS reports any reasonable speed OR
+          // 2. Distance moved is above threshold AND accuracy is reasonable OR  
+          // 3. Any movement detected with good accuracy (< 20m) OR
+          // 4. After 10 seconds of tracking, be more aggressive (assume user is walking)
+          const aggressiveMode = currentTrackingDuration > 10;
+          movementDetected = speedBasedMovement || 
+                           (distanceBasedMovement && accuracyIsReasonable) ||
+                           (distanceFromLast > 1 && accuracy < 20) ||
+                           (aggressiveMode && distanceFromLast > 0.3 && accuracy < 30);
 
-          // Movement detected if:
-          // 1. GPS reports speed > walking threshold OR
-          // 2. Distance moved > sensitive threshold AND accuracy is reasonable (< 50m)
-          movementDetected = speedBasedMovement || (distanceBasedMovement && accuracy < 50);
-
-          // Only add to total distance if movement is detected and distance is reasonable
-          if (movementDetected && distanceFromLast < 100) { // Prevent GPS jumps > 100m
+          // Add distance for any reasonable movement
+          if (distanceFromLast > 0.5 && distanceFromLast < maxReasonableDistance) {
+            // Always add distance if we moved more than 0.5m and it's reasonable
+            if (movementDetected || accuracy < 15) {
+              setDistance((prevDist) => prevDist + distanceFromLast);
+              setLastValidPosition(newPos);
+            }
+          } else if (distanceFromLast > 0.2 && distanceFromLast < 5 && accuracy < 10) {
+            // For very small movements with excellent accuracy, still count them
             setDistance((prevDist) => prevDist + distanceFromLast);
+            setLastValidPosition(newPos);
+            movementDetected = true;
           }
 
           setIsMoving(movementDetected);
-
-          // Update last position more frequently for better tracking
-          if (distanceFromLast > 1 || movementDetected) { // Update every 1m or when moving
-            setLastValidPosition(newPos);
-          }
         } else {
-          // First position - always add to path
+          // First position - set as reference point
           setLastValidPosition(newPos);
           setIsMoving(false);
+          setLastUpdateTime(currentTime);
         }
 
         // Update speed (use calculated speed if GPS speed is unreliable)
-        setSpeed(actualSpeed);
+        let displaySpeed = actualSpeed;
+        const currentTime = Date.now();
+        
+        // If GPS speed is not available or seems unreliable, calculate from distance and time
+        if ((!actualSpeed || actualSpeed < 0.1) && lastValidPosition && distanceFromLast > 0 && lastUpdateTime) {
+          const timeInterval = (currentTime - lastUpdateTime) / 1000; // Time in seconds
+          if (timeInterval > 0 && timeInterval < 10) { // Only use if reasonable time interval
+            displaySpeed = distanceFromLast / timeInterval;
+          }
+        }
+        
+        setSpeed(displaySpeed);
+        setLastUpdateTime(currentTime);
 
         // Update status message with movement detection
         const accuracyText = accuracy < 10 ? '🟢 Excellent' : accuracy < 20 ? '🟡 Good' : accuracy < 50 ? '🟠 Fair' : '🔴 Poor';
         const movementStatus = movementDetected ? '🏃‍♂️ Moving' : '⏸️ Stationary';
-        const speedKmh = (actualSpeed * 3.6).toFixed(1);
+        const speedKmh = (displaySpeed * 3.6).toFixed(1);
+        const distanceKm = (distance / 1000).toFixed(3);
+        const aggressiveMode = currentTrackingDuration > 10;
 
-        setMessage(`📍 ${movementStatus} | ${accuracyText} GPS (±${accuracy.toFixed(0)}m) | Speed: ${speedKmh} km/h | Points: ${path.length}`);
+        setMessage(`📍 ${movementStatus} | ${accuracyText} GPS (±${accuracy.toFixed(0)}m) | Speed: ${speedKmh} km/h | Distance: ${distanceKm}km | ${aggressiveMode ? '🔥 Enhanced' : '🔄 Standard'} | Points: ${path.length}`);
       },
       (error) => {
         let errorMsg = '❌ GPS Error: ';
@@ -375,10 +377,10 @@ function App() {
     }
   };
 
-  // Submit to blockchain
-  const submitToBlockchain = async () => {
-    if (!walletAddress) {
-      setMessage('Please connect wallet first');
+  // Submit to Stellar blockchain
+  const submitToStellar = async () => {
+    if (!walletAddress || !stellarWalletInfo) {
+      setMessage('Please connect Stellar wallet first');
       return;
     }
 
@@ -397,41 +399,33 @@ function App() {
     }
 
     try {
-      if (!signer) {
-        setMessage('❌ Please connect MetaMask wallet first');
-        return;
-      }
+      // Generate activity ID from starting coordinates and timestamp
+      const activityId = `activity_${start[0].toFixed(4)}_${start[1].toFixed(4)}_${Date.now()}`;
 
-      // Generate loop ID from starting coordinates
-      const loopId = `loop_${start[0].toFixed(4)}_${start[1].toFixed(4)}`;
+      setMessage(`🔄 Submitting to Stellar ${stellarNetwork?.network || 'testnet'} network... Activity ID: ${activityId}`);
 
-      setMessage(`🔄 Submitting to ${networkInfo?.name || 'Ethereum'} blockchain... Loop ID: ${loopId}`);
-
-      // Prepare fitness data for blockchain
+      // Prepare fitness data for Stellar blockchain
       const fitnessData = {
-        loopId,
+        activityId,
+        walletAddress: stellarWalletInfo.publicKey,
+        walletType: stellarWalletInfo.walletType,
         startCoords: [start[0], start[1]],
         endCoords: [end[0], end[1]],
         distance: Math.round(distance),
         time: elapsedTime,
         timestamp: Math.floor(Date.now() / 1000),
-        pathLength: path.length
+        pathLength: path.length,
+        network: stellarNetwork?.network
       };
 
-      console.log('📊 Fitness Data:', fitnessData);
+      console.log('🌟 Stellar Fitness Data:', fitnessData);
 
-      // If contract address is configured, attempt contract interaction
-      if (CONTRACT_ADDRESS && CONTRACT_ADDRESS !== '0x...Your...Deployed...Address...') {
-        // TODO: Add actual smart contract interaction here
-        // const contract = new ethers.Contract(CONTRACT_ADDRESS, contractABI, signer);
-        // const tx = await contract.submitFitnessData(fitnessData);
-        // await tx.wait();
+      // TODO: Implement Stellar smart contract interaction
+      // This would involve creating a transaction with the fitness data
+      // and submitting it to the Stellar network
 
-        setMessage(`✅ Ready to submit to blockchain! Contract: ${CONTRACT_ADDRESS.slice(0, 6)}...${CONTRACT_ADDRESS.slice(-4)}`);
-      } else {
-        setMessage(`✅ Fitness data prepared for blockchain! Loop: ${loopId}, Time: ${elapsedTime}s, Distance: ${distance.toFixed(0)}m`);
-        console.log('ℹ️ Contract address not configured. Add VITE_PUBLIC_CONTRACT_ADDRESS to .env file');
-      }
+      setMessage(`✅ Fitness data prepared for Stellar! Activity: ${activityId}, Time: ${elapsedTime}s, Distance: ${distance.toFixed(0)}m`);
+      console.log('ℹ️ Stellar smart contract integration coming soon');
 
     } catch (error) {
       console.error('Blockchain submission error:', error);
@@ -445,6 +439,7 @@ function App() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Smooth navigation handlers - no URL changes, instant transitions
   const handleEnterApp = () => {
     setCurrentPage('app');
   };
@@ -457,88 +452,178 @@ function App() {
     setCurrentPage('contests');
   };
 
+  const handleShowLeaderboard = () => {
+    setCurrentPage('leaderboard');
+  };
+
+  const handleShowContestLeaderboard = () => {
+    setCurrentPage('contest-leaderboard');
+  };
+
+  const handleShowDemo = () => {
+    setCurrentPage('demo');
+  };
+
+  const handleShowWallet = () => {
+    setCurrentPage('wallet');
+  };
+
   const handleBackToApp = () => {
     setCurrentPage('app');
   };
 
+  // Wallet context value - shared across all pages
+  const walletContextValue = {
+    walletAddress,
+    stellarWalletInfo,
+    stellarNetwork,
+    walletConnectionPersisted,
+    isConnected: !!stellarWalletInfo,
+    onConnect: handleStellarWalletConnect,
+    onDisconnect: handleStellarWalletDisconnect,
+    formatAddress: (address) => address ? `${address.slice(0, 6)}...${address.slice(-4)}` : ''
+  };
 
 
-  if (currentPage === 'loading') {
-    return <LoadingScreen isVisible={true} />;
-  }
 
-  if (currentPage === 'landing') {
-    return (
-      <AnimatePresence mode="wait">
-        <motion.div
-          key="landing"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <LandingPage onEnterApp={handleEnterApp} onShowContests={handleShowContests} />
-        </motion.div>
-      </AnimatePresence>
-    );
-  }
-
-  if (currentPage === 'contests') {
-    return (
-      <AnimatePresence mode="wait">
-        <motion.div
-          key="contests"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <ContestPage onBack={handleBackToApp} />
-        </motion.div>
-      </AnimatePresence>
-    );
-  }
-
+  // Render with wallet context provider
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key="app"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -20 }}
-        transition={{ duration: 0.5 }}
-        className="app"
-        data-barba="container"
-        data-barba-namespace="app"
-      >
-        <div className="app-header glass">
-          <div className="header-content">
-            <button onClick={handleBackToLanding} className="back-button">
-              ← Back to Landing
-            </button>
-            <div className="header-main">
-              <h1>🏃‍♂️ FitChain</h1>
-              <p className="header-subtitle">Decentralized Fitness Tracking on Blockchain</p>
-            </div>
-          </div>
-          {walletAddress ? (
-            <div className="wallet-connected glass">
-              <div className="wallet-avatar">🦊</div>
-              <div className="wallet-info">
-                <div className="wallet-label">Connected</div>
-                <div className="wallet-address">
-                  {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="wallet-buttons">
-              <button onClick={connectWallet} className="wallet-btn">
-                🦊 Connect MetaMask
-              </button>
-            </div>
-          )}
-        </div>
+    <WalletContext.Provider value={walletContextValue}>
+      {currentPage === 'loading' && <LoadingScreen isVisible={true} />}
+      
+      <AnimatePresence mode="wait">
+        {currentPage === 'landing' && (
+          <motion.div
+            key="landing"
+            initial={{ opacity: 0, x: -100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 100 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+          >
+            <LandingPage 
+              onEnterApp={handleEnterApp} 
+              onShowContests={handleShowContests} 
+              onShowLeaderboard={handleShowLeaderboard} 
+              onShowContestLeaderboard={handleShowContestLeaderboard}
+              onShowDemo={handleShowDemo}
+              onShowWallet={handleShowWallet}
+              walletInfo={walletContextValue}
+            />
+          </motion.div>
+        )}
+
+        {currentPage === 'contests' && (
+          <motion.div
+            key="contests"
+            initial={{ opacity: 0, x: -100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 100 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="app"
+          >
+            <GlobalNavigation
+              currentPage="contests"
+              onNavigate={setCurrentPage}
+              title="🏆 Fitness Contests"
+              subtitle="Join competitions and win rewards"
+            />
+            <ContestPage onBack={handleBackToApp} />
+          </motion.div>
+        )}
+
+        {currentPage === 'leaderboard' && (
+          <motion.div
+            key="leaderboard"
+            initial={{ opacity: 0, x: -100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 100 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="app"
+          >
+            <GlobalNavigation
+              currentPage="leaderboard"
+              onNavigate={setCurrentPage}
+              title="📊 Leaderboard"
+              subtitle="Track performance and view contest results"
+            />
+            <Leaderboard />
+          </motion.div>
+        )}
+
+        {currentPage === 'contest-leaderboard' && (
+          <motion.div
+            key="contest-leaderboard"
+            initial={{ opacity: 0, x: -100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 100 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="app"
+          >
+            <GlobalNavigation
+              currentPage="contest-leaderboard"
+              onNavigate={setCurrentPage}
+              title="👑 Contest Champions"
+              subtitle="View winners and leaderboards for each contest event"
+            />
+            <ContestLeaderboard />
+          </motion.div>
+        )}
+
+        {currentPage === 'demo' && (
+          <motion.div
+            key="demo"
+            initial={{ opacity: 0, x: -100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 100 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+          >
+            <NavigationDemo />
+          </motion.div>
+        )}
+
+        {currentPage === 'wallet' && (
+          <motion.div
+            key="wallet"
+            initial={{ opacity: 0, x: -100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 100 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="app"
+          >
+            <GlobalNavigation
+              currentPage="wallet"
+              onNavigate={setCurrentPage}
+              title="💼 Wallet & Payments"
+              subtitle="Manage your Stellar wallet and payments"
+            />
+            <WalletIntegration
+              onWalletConnect={handleStellarWalletConnect}
+              onWalletDisconnect={handleStellarWalletDisconnect}
+              onPaymentComplete={(result) => {
+                console.log('Payment completed:', result);
+                setMessage(`✅ Payment completed: ${result.transactionHash}`);
+              }}
+            />
+          </motion.div>
+        )}
+
+        {currentPage === 'app' && (
+          <motion.div
+            key="app"
+            initial={{ opacity: 0, x: -100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 100 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="app"
+            data-barba="container"
+            data-barba-namespace="app"
+          >
+            <GlobalNavigation
+              currentPage="app"
+              onNavigate={setCurrentPage}
+              title="🏃‍♂️ FitChain"
+              subtitle="Decentralized Fitness Tracking on Blockchain"
+            />
 
         {/* Platform Statistics */}
         <motion.div
@@ -661,10 +746,10 @@ function App() {
                 exit={{ opacity: 0, x: 20 }}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={submitToBlockchain}
+                onClick={submitToStellar}
                 className="btn btn-submit"
               >
-                Submit to Blockchain
+                Submit to Stellar
               </motion.button>
             )}
           </AnimatePresence>
@@ -710,7 +795,11 @@ function App() {
               </div>
               <div className="debug-item">
                 <span className="debug-label">Distance from Last:</span>
-                <span className="debug-value">{lastValidPosition ? calculateDistance(lastValidPosition[0], lastValidPosition[1], currentPosition[0], currentPosition[1]).toFixed(1) : '0'}m</span>
+                <span className="debug-value">{lastValidPosition && currentPosition ? calculateDistance(lastValidPosition[0], lastValidPosition[1], currentPosition[0], currentPosition[1]).toFixed(1) : '0'}m</span>
+              </div>
+              <div className="debug-item">
+                <span className="debug-label">Total Distance:</span>
+                <span className="debug-value">{distance.toFixed(1)}m</span>
               </div>
               <div className="debug-item">
                 <span className="debug-label">GPS Speed:</span>
@@ -741,17 +830,29 @@ function App() {
         <FloatingActions
           onBackToLanding={handleBackToLanding}
           onShowContests={handleShowContests}
+          onShowLeaderboard={handleShowLeaderboard}
+          onShowContestLeaderboard={handleShowContestLeaderboard}
+          onShowDemo={handleShowDemo}
+          onShowWallet={handleShowWallet}
           isTracking={isTracking}
         />
 
-        {/* Blockchain Status Debug Panel */}
-        <BlockchainStatus
-          provider={provider}
-          networkInfo={networkInfo}
-          walletAddress={walletAddress}
-        />
-      </motion.div>
-    </AnimatePresence>
+            {/* Freighter Status - Development Only */}
+            {process.env.NODE_ENV === 'development' && (
+              <FreighterStatus />
+            )}
+
+            {/* Stellar Network Status Debug Panel */}
+            <BlockchainStatus
+              provider={stellarNetwork}
+              networkInfo={stellarNetwork}
+              walletAddress={walletAddress}
+              walletType={stellarWalletInfo?.walletType}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </WalletContext.Provider>
   );
 }
 

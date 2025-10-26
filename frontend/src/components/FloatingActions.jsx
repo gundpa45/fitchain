@@ -2,14 +2,16 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './FloatingActions.css';
 
-const FloatingActions = ({ onBackToLanding, onShowContests, isTracking }) => {
+const FloatingActions = ({ onBackToLanding, onShowContests, onShowLeaderboard, onShowContestLeaderboard, onShowDemo, onShowWallet, isTracking }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const actions = [
     { icon: '🏠', label: 'Home', action: onBackToLanding },
     { icon: '🏆', label: 'Contests', action: onShowContests },
-    { icon: '📊', label: 'Stats', action: () => console.log('Stats') },
-    { icon: '🎁', label: 'Rewards', action: () => console.log('Rewards') },
+    { icon: '📊', label: 'Leaderboard', action: onShowLeaderboard },
+    { icon: '👑', label: 'Champions', action: onShowContestLeaderboard },
+    { icon: '💼', label: 'Wallet', action: onShowWallet },
+    { icon: '🎯', label: 'Demo', action: onShowDemo },
     { icon: '⚙️', label: 'Settings', action: () => console.log('Settings') }
   ];
 

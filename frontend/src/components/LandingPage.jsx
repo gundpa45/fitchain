@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import './LandingPage.css';
 
-const LandingPage = ({ onEnterApp, onShowContests }) => {
+const LandingPage = ({ onEnterApp, onShowContests, onShowLeaderboard, onShowContestLeaderboard, onShowDemo, onShowWallet, walletInfo }) => {
   const [currentFeature, setCurrentFeature] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -135,17 +135,57 @@ const LandingPage = ({ onEnterApp, onShowContests }) => {
             >
               Contests
             </motion.button>
+            <motion.button
+              className="nav-link"
+              onClick={onShowLeaderboard}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Leaderboard
+            </motion.button>
+            <motion.button
+              className="nav-link"
+              onClick={onShowContestLeaderboard}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Champions
+            </motion.button>
+            <motion.button
+              className="nav-link"
+              onClick={onShowDemo}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Demo
+            </motion.button>
+            <motion.button
+              className="nav-link"
+              onClick={onShowWallet}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Wallet
+            </motion.button>
           </div>
 
-          {/* CTA Button */}
-          <motion.button
-            className="nav-cta-button"
-            onClick={onEnterApp}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            🚀 Launch App
-          </motion.button>
+          {/* Wallet Status & CTA Button */}
+          <div className="nav-cta-section">
+            {walletInfo?.isConnected && (
+              <div className="nav-wallet-status">
+                <span className="wallet-indicator">🚀</span>
+                <span className="wallet-text">{walletInfo.formatAddress(walletInfo.walletAddress)}</span>
+              </div>
+            )}
+            <motion.button
+              className="nav-cta-button"
+              onClick={onEnterApp}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              {walletInfo?.isConnected ? '🚀 Enter App' : '🚀 Launch App'}
+            </motion.button>
+          </div>
 
           {/* Mobile Menu Button */}
           <motion.button
@@ -187,8 +227,20 @@ const LandingPage = ({ onEnterApp, onShowContests }) => {
             <button className="mobile-nav-link" onClick={onShowContests}>
               🏆 Contests
             </button>
+            <button className="mobile-nav-link" onClick={onShowLeaderboard}>
+              📊 Leaderboard
+            </button>
+            <button className="mobile-nav-link" onClick={onShowContestLeaderboard}>
+              👑 Champions
+            </button>
+            <button className="mobile-nav-link" onClick={onShowDemo}>
+              🎯 Navigation Demo
+            </button>
+            <button className="mobile-nav-link" onClick={onShowWallet}>
+              💼 Wallet & Payments
+            </button>
             <button className="mobile-nav-cta" onClick={onEnterApp}>
-              🚀 Launch App
+              {walletInfo?.isConnected ? '🚀 Enter App' : '🚀 Launch App'}
             </button>
           </div>
         </motion.div>

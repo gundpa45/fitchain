@@ -1173,4 +1173,43 @@
   .cta-title {
     font-size: 1.8rem;
   }
+}/* Naviga
+tion wallet status */
+.nav-cta-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.nav-wallet-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 20px;
+  font-size: 0.85rem;
+  color: #10b981;
+  font-weight: 500;
+}
+
+.wallet-indicator {
+  font-size: 1rem;
+}
+
+.wallet-text {
+  font-family: 'Courier New', monospace;
+}
+
+@media (max-width: 768px) {
+  .nav-cta-section {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .nav-wallet-status {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.8rem;
+  }
 }
