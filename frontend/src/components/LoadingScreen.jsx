@@ -12,19 +12,51 @@ const LoadingScreen = ({ isVisible }) => {
       className="loading-screen"
     >
       <div className="loading-content">
-        <motion.div
-          animate={{
-            rotate: 360,
-            scale: [1, 1.2, 1]
-          }}
-          transition={{
-            rotate: { duration: 2, repeat: Infinity, ease: "linear" },
-            scale: { duration: 1, repeat: Infinity, ease: "easeInOut" }
-          }}
-          className="loading-icon"
-        >
-          🏃‍♂️
-        </motion.div>
+        {/* Road Animation */}
+        <div className="road-container">
+          <div className="road">
+            <div className="road-lines">
+              <div className="road-line"></div>
+              <div className="road-line"></div>
+              <div className="road-line"></div>
+              <div className="road-line"></div>
+              <div className="road-line"></div>
+            </div>
+          </div>
+          
+          {/* Walking Man Animation */}
+          <motion.div
+            animate={{
+              x: [-120, 120],
+            }}
+            transition={{
+              duration: 4,
+              repeat: Infinity,
+              ease: "linear"
+            }}
+            className="walking-man"
+          >
+            <motion.div
+              animate={{
+                rotateY: [0, 5, -5, 0],
+                scale: [1, 1.05, 1, 1.05, 1]
+              }}
+              transition={{
+                rotateY: { duration: 0.8, repeat: Infinity, ease: "easeInOut" },
+                scale: { duration: 0.4, repeat: Infinity, ease: "easeInOut" }
+              }}
+              className="man-icon"
+            >
+              🚶‍♂️
+            </motion.div>
+          </motion.div>
+          
+          {/* Road Side Elements */}
+          <div className="road-side-elements">
+            <div className="tree left">🌳</div>
+            <div className="tree right">🌳</div>
+          </div>
+        </div>
         
         <motion.h2
           initial={{ opacity: 0, y: 20 }}
@@ -41,13 +73,13 @@ const LoadingScreen = ({ isVisible }) => {
           transition={{ delay: 0.4 }}
           className="loading-subtitle"
         >
-          Initializing your fitness journey...
+          Starting your fitness journey...
         </motion.p>
         
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: "100%" }}
-          transition={{ duration: 2, ease: "easeInOut" }}
+          transition={{ duration: 2.5, ease: "easeInOut" }}
           className="loading-bar"
         >
           <div className="loading-progress"></div>

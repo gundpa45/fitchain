@@ -58,9 +58,10 @@
   padding: 0 20px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   position: relative;
   z-index: 2;
+  gap: 40px;
 }
 
 .nav-logo {
@@ -128,13 +129,15 @@
   background: linear-gradient(135deg, var(--primary-gold) 0%, #FFD700 100%);
   color: var(--dark-bg);
   border: none;
-  padding: 12px 24px;
-  border-radius: 25px;
-  font-size: 0.95rem;
-  font-weight: 600;
+  padding: 15px 40px;
+  border-radius: 30px;
+  font-size: 1.1rem;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
+  min-width: 180px;
+  white-space: nowrap;
 }
 
 .nav-cta-button:hover {
@@ -257,18 +260,24 @@
 
 /* Responsive Design */
 @media (max-width: 768px) {
+  .nav-container {
+    justify-content: space-between;
+    padding: 0 15px;
+  }
 
   .nav-links,
-  .nav-cta-button {
+  .nav-cta-section {
     display: none;
   }
 
   .mobile-menu-button {
     display: block;
   }
+}
 
-  .nav-container {
-    padding: 0 15px;
+@media (min-width: 769px) {
+  .mobile-menu-button {
+    display: none;
   }
 }
 
@@ -1212,4 +1221,34 @@ tion wallet status */
     font-size: 0.75rem;
     padding: 0.4rem 0.8rem;
   }
+}/
+* Navigation Wallet Status Styles */
+.nav-wallet-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.wallet-indicator {
+  font-size: 1rem;
+}
+
+.wallet-text {
+  font-size: 0.9rem;
+  color: #FFD700;
+  font-weight: 500;
+  font-family: monospace;
+}
+
+/* Enhanced CTA Section */
+.nav-cta-section {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-shrink: 0;
 }
